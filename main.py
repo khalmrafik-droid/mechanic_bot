@@ -3,7 +3,7 @@ import time
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery, FSInputFile
-
+from aiogram.exceptions import TelegramBadRequest
 from config import BOT_TOKEN
 from database import init_db, get_user, update_user, reset_car
 from keyboards import get_main_menu, get_car_menu
@@ -85,11 +85,16 @@ async def do_work(callback: CallbackQuery):
     updated_data = get_user(callback.from_user.id) 
     
     # Меняем текст сообщения
-    await callback.message.edit_text(
-        "💼 Ты отработал смену в сервисе и заработал **30 монет**!\n"
-        "Следующая смена будет доступна через 15 минут.",
-        reply_markup=get_main_menu(updated_data), parse_mode="Markdown"
-    )
+     try:
+        await callback.message.edit_text(
+            "💼 Ты отработал смену в сервисе и заработал **30 монет**!\n"
+            "Следующая смена будет доступна через 15 минут.",
+            reply_markup=get_main_menu(updated_data), parse_mode="Markdown"
+        )
+    except TelegramBadRequest:
+        # Если сообщение не изменилось, просто ничего не делаем
+        pass
+        
     await callback.answer()
 
 @dp.callback_query(F.data == "fix_wheels")
