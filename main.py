@@ -1,4 +1,5 @@
 import asyncio
+import time 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery, FSInputFile
@@ -58,10 +59,36 @@ async def show_car(callback: CallbackQuery):
 @dp.callback_query(F.data == "work")
 async def do_work(callback: CallbackQuery):
     user_data = get_user(callback.from_user.id)
-    update_user(callback.from_user.id, coins=user_data["coins"] + 30)
+    current_time = time.time()
+    
+    # ТУТ МЕНЯЕМ 300 НА 900 (15 минут)
+    COOLDOWN = 900 
+    
+    time_passed = current_time - user_data["last_work"]
+    
+    if time_passed < COOLDOWN:
+        remaining = int(COOLDOWN - time_passed)
+        minutes = remaining // 60
+        seconds = remaining % 60
+        
+        if minutes > 0:
+            time_text = f"{minutes} мин. {seconds} сек."
+        else:
+            time_text = f"{seconds} сек."
+            
+        await callback.answer(f"⏳ Ты устал. Отдохни еще {time_text}.", show_alert=True)
+        return
+        
+    update_user(callback.from_user.id, coins=user_data["coins"] + 30, last_work_time=current_time)
+    
+    # Берем обновленные данные
+    updated_data = get_user(callback.from_user.id) 
+    
+    # Меняем текст сообщения
     await callback.message.edit_text(
-        "💼 Ты отработал смену в сервисе и заработал **30 монет**!",
-        reply_markup=get_main_menu(), parse_mode="Markdown"
+        "💼 Ты отработал смену в сервисе и заработал **30 монет**!\n"
+        "Следующая смена будет доступна через 15 минут.",
+        reply_markup=get_main_menu(updated_data), parse_mode="Markdown"
     )
     await callback.answer()
 
