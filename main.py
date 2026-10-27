@@ -58,31 +58,45 @@ async def show_car(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "work")
 async def do_work(callback: CallbackQuery):
-    user_data = get_user(callback.from_user.id)
-    current_time = time.time()
-    
-    # ТУТ МЕНЯЕМ 300 НА 900 (15 минут)
-    COOLDOWN = 900 
-    
-    time_passed = current_time - user_data["last_work"]
-    
-    if time_passed < COOLDOWN:
-        remaining = int(COOLDOWN - time_passed)
-        minutes = remaining // 60
-        seconds = remaining % 60
+    try:
+        user_data = get_user(callback.from_user.id)
+        current_time = time.time()
         
-        if minutes > 0:
-            time_text = f"{minutes} мин. {seconds} сек."
-        else:
-            time_text = f"{seconds} сек."
+        COOLDOWN = 900 
+        
+        time_passed = current_time - user_data["last_work"]
+        
+        if time_passed < COOLDOWN:
+            remaining = int(COOLDOWN - time_passed)
+            minutes = remaining // 60
+            seconds = remaining % 60
             
-        await callback.answer(f"⏳ Ты устал. Отдохни еще {time_text}.", show_alert=True)
-        return
+            if minutes > 0:
+                time_text = f"{minutes} мин. {seconds} сек."
+            else:
+                time_text = f"{seconds} сек."
+                
+            await callback.answer(f"⏳ Ты устал. Отдохни еще {time_text}.", show_alert=True)
+            return
+            
+        update_user(callback.from_user.id, coins=user_data["coins"] + 30, last_work_time=current_time)
+        updated_data = get_user(callback.from_user.id) 
         
-    update_user(callback.from_user.id, coins=user_data["coins"] + 30, last_work_time=current_time)
-    
-    # Берем обновленные данные
-    updated_data = get_user(callback.from_user.id) 
+        try:
+            await callback.message.edit_text(
+                f"💼 Ты отработал смену в сервисе и заработал **30 монет**!\n"
+                f"Твой баланс: {updated_data['coins']} монет.\n"
+                f"Следующая смена будет доступна через 15 минут.",
+                reply_markup=get_main_menu(updated_data), 
+                parse_mode="Markdown"
+            )
+        except TelegramBadRequest:
+            pass 
+            
+        await callback.answer("Успешно!")
+        
+    except Exception as e:
+        await callback.answer(f"Ошибка: {str(e)[:50]}", show_alert=True)
     
     # Меняем текст сообщения
      try:
