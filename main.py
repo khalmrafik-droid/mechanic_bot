@@ -1,9 +1,10 @@
 import asyncio
-import time 
+import time
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.exceptions import TelegramBadRequest
+
 from config import BOT_TOKEN
 from database import init_db, get_user, update_user, reset_car
 from keyboards import get_main_menu, get_car_menu
@@ -22,11 +23,11 @@ def get_car_image_path(user_data):
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
-    get_user(message.from_user.id)
+    user_data = get_user(message.from_user.id)
     await message.answer(
         "Привет! Ты — начинающий механик. У тебя есть ржавая «шестёрка», которую нужно восстановить и выгодно продать.\n"
         "Зарабатывай монеты на подработке и покупай запчасти!",
-        reply_markup=get_main_menu()
+        reply_markup=get_main_menu(user_data)
     )
 
 @dp.callback_query(F.data == "view_car")
@@ -49,7 +50,6 @@ async def show_car(callback: CallbackQuery):
             photo=photo, caption=text, parse_mode="Markdown", reply_markup=get_car_menu(user_data)
         )
     except Exception as e:
-        # Если картинку не нашли, присылаем текст (чтобы бот не падал)
         await callback.message.answer(
             text + f"\n\n⚠️ *Картинка не найдена ({photo_path})*", 
             parse_mode="Markdown", reply_markup=get_car_menu(user_data)
@@ -97,19 +97,6 @@ async def do_work(callback: CallbackQuery):
         
     except Exception as e:
         await callback.answer(f"Ошибка: {str(e)[:50]}", show_alert=True)
-    
-    # Меняем текст сообщения
-     try:
-        await callback.message.edit_text(
-            "💼 Ты отработал смену в сервисе и заработал **30 монет**!\n"
-            "Следующая смена будет доступна через 15 минут.",
-            reply_markup=get_main_menu(updated_data), parse_mode="Markdown"
-        )
-    except TelegramBadRequest:
-        # Если сообщение не изменилось, просто ничего не делаем
-        pass
-        
-    await callback.answer()
 
 @dp.callback_query(F.data == "fix_wheels")
 async def fix_wheels(callback: CallbackQuery):
@@ -154,18 +141,20 @@ async def sell_car(callback: CallbackQuery):
     reset_car(callback.from_user.id)
     
     await callback.message.delete()
+    updated_data = get_user(callback.from_user.id)
     await callback.message.answer(
         f"💰 Ты продал машину за **{sell_price} монет**!\n"
-        f"Твой баланс: {get_user(callback.from_user.id)['coins']} монет.\n\n"
+        f"Твой баланс: {updated_data['coins']} монет.\n\n"
         f"В гараж заехала следующая ржавая «шестёрка». Крути гайки дальше!",
-        reply_markup=get_main_menu(), parse_mode="Markdown"
+        reply_markup=get_main_menu(updated_data), parse_mode="Markdown"
     )
     await callback.answer()
 
 @dp.callback_query(F.data == "main_menu")
 async def back_to_menu(callback: CallbackQuery):
+    user_data = get_user(callback.from_user.id)
     await callback.message.delete()
-    await callback.message.answer("Главное меню:", reply_markup=get_main_menu())
+    await callback.message.answer("Главное меню:", reply_markup=get_main_menu(user_data))
     await callback.answer()
 
 async def main():
